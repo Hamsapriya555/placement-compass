@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment
+.env
+.env.docker
+
+# Distribution
+dist/
+build/
+
+# Test and editor
+.pytest_cache/
+.vscode/
+.idea/

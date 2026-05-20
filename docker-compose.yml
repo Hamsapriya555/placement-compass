@@ -1,0 +1,211 @@
+# =============================================================================
+# docker-compose.yml — LangGraph + FastAPI Backend
+# =============================================================================
+#
+# Usage
+# -----
+#   Production:   docker compose up --build
+#   Development:  docker compose --profile dev up --build
+#
+# Ollama runs on the HOST — NOT inside Docker.
+# The `extra_hosts` entry below resolves "host.docker.internal" on Linux.
+# On Windows / macOS with Docker Desktop this alias is available automatically.
+#
+# Before starting:
+#   1. Copy .env.docker.example → .env.docker
+#   2. Fill in LANGCHAIN_API_KEY and other secrets
+#   3. Ensure `ollama serve` is running on your host
+# =============================================================================
+
+services:
+
+  # ── FastAPI + LangGraph backend ──────────────────────────────────────────
+  langgraph-api:
+    build:
+      context: .                    # build context is the project root
+      dockerfile: Dockerfile
+      target: runtime               # use the lean runtime stage
+    image: langgraph-api:latest
+    container_name: langgraph-api
+
+    # ── Port mapping ────────────────────────────────────────────────────────
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+    # ── Environment variables ───────────────────────────────────────────────
+    # env_file loads .env.docker (git-ignored).  Values here override the file.
+    env_file:
+      - .env.docker
+
+    environment:
+      # --- Ollama connectivity (host machine) --------------------------------
+      # host.docker.internal resolves to the Docker host on all platforms.
+      # On Linux, extra_hosts below adds this alias automatically.
+      OLLAMA_HOST: "http://host.docker.internal:11434"
+      OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+
+      # --- LangSmith tracing -------------------------------------------------
+      # LANGCHAIN_API_KEY is loaded from .env.docker — do not hardcode here
+      LANGCHAIN_TRACING_V2: "${LANGCHAIN_TRACING_V2:-false}"
+      LANGCHAIN_ENDPOINT: "${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}"
+      LANGCHAIN_PROJECT: "${LANGCHAIN_PROJECT:-langgraph-company-intelligence}"
+
+      # --- FastAPI / runtime -------------------------------------------------
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+
+      # --- Model selection ---------------------------------------------------
+      MODEL_PHI3:    "${MODEL_PHI3:-phi3:mini}"
+      MODEL_LLAMA:   "${MODEL_LLAMA:-llama3.1:8b}"
+      MODEL_QWEN:    "${MODEL_QWEN:-qwen2.5:7b}"
+      MODEL_MISTRAL: "${MODEL_MISTRAL:-mistral:7b}"
+
+      # --- LLM settings ------------------------------------------------------
+      MAX_RETRY_ATTEMPTS:    "${MAX_RETRY_ATTEMPTS:-3}"
+      OLLAMA_TIMEOUT_SECONDS: "${OLLAMA_TIMEOUT_SECONDS:-120}"
+      OLLAMA_TEMPERATURE:    "${OLLAMA_TEMPERATURE:-0.0}"
+
+      # --- Persistence / output paths ----------------------------------------
+      PERSISTENCE_ENABLED: "${PERSISTENCE_ENABLED:-false}"
+      PERSISTENCE_DIR:     "/app/langgraph_app/persistence"
+      OUTPUT_DIR:          "/app/langgraph_app/outputs"
+      LOG_DIR:             "/app/langgraph_app/logs"
+
+      # --- API metadata ------------------------------------------------------
+      API_TITLE:   "${API_TITLE:-LangGraph Company Intelligence API}"
+      API_VERSION: "${API_VERSION:-v1}"
+
+    # ── Named volumes (data persisted across container restarts) ────────────
+    volumes:
+      - langgraph_outputs:/app/langgraph_app/outputs
+      - langgraph_persistence:/app/langgraph_app/persistence
+      - langgraph_logs:/app/langgraph_app/logs
+
+    # ── Host networking (Ollama on host) ─────────────────────────────────────
+    # On Linux, adds host.docker.internal → host-gateway to /etc/hosts.
+    # On Windows/macOS Docker Desktop, this mapping already exists natively.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # ── Healthcheck ──────────────────────────────────────────────────────────
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    # ── Restart policy ───────────────────────────────────────────────────────
+    restart: unless-stopped
+
+    # ── Logging ──────────────────────────────────────────────────────────────
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    # ── Resource limits (adjust for your host) ───────────────────────────────
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
+
+  # ── Development override service (hot-reload) ────────────────────────────
+  # Run with:  docker compose --profile dev up --build
+  langgraph-api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: langgraph-api:dev
+    container_name: langgraph-api-dev
+    profiles:
+      - dev
+
+    ports:
+      - "${API_PORT_DEV:-8001}:8000"
+
+    env_file:
+      - .env.docker
+
+    environment:
+      OLLAMA_HOST:     "http://host.docker.internal:11434"
+      OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+      LANGCHAIN_TRACING_V2: "${LANGCHAIN_TRACING_V2:-false}"
+      LANGCHAIN_ENDPOINT:   "${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}"
+      LANGCHAIN_PROJECT:    "${LANGCHAIN_PROJECT:-langgraph-dev}"
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: "debug"
+      MODEL_PHI3:    "${MODEL_PHI3:-phi3:mini}"
+      MODEL_LLAMA:   "${MODEL_LLAMA:-llama3.1:8b}"
+      MODEL_QWEN:    "${MODEL_QWEN:-qwen2.5:7b}"
+      MODEL_MISTRAL: "${MODEL_MISTRAL:-mistral:7b}"
+      MAX_RETRY_ATTEMPTS:    "${MAX_RETRY_ATTEMPTS:-3}"
+      OLLAMA_TIMEOUT_SECONDS: "${OLLAMA_TIMEOUT_SECONDS:-120}"
+      PERSISTENCE_ENABLED: "${PERSISTENCE_ENABLED:-false}"
+      PERSISTENCE_DIR:     "/app/langgraph_app/persistence"
+      OUTPUT_DIR:          "/app/langgraph_app/outputs"
+      LOG_DIR:             "/app/langgraph_app/logs"
+      API_TITLE:   "${API_TITLE:-LangGraph Company Intelligence API [DEV]}"
+      API_VERSION: "${API_VERSION:-v1}"
+
+    volumes:
+      # Hot-reload: mount source code so edits take effect without rebuild
+      - ./langgraph_app:/app/langgraph_app:ro
+      - langgraph_outputs_dev:/app/langgraph_app/outputs
+      - langgraph_persistence_dev:/app/langgraph_app/persistence
+      - langgraph_logs_dev:/app/langgraph_app/logs
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    # Hot-reload: override CMD to use --reload flag
+    command:
+      - "uvicorn"
+      - "langgraph_app.backend.main:app"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--reload"
+      - "--reload-dir"
+      - "/app/langgraph_app"
+      - "--log-level"
+      - "debug"
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Named volumes — data persists across docker compose down/up cycles
+# Use `docker compose down -v` to also remove volumes (wipes all output data)
+# =============================================================================
+volumes:
+  langgraph_outputs:
+    driver: local
+  langgraph_persistence:
+    driver: local
+  langgraph_logs:
+    driver: local
+  langgraph_outputs_dev:
+    driver: local
+  langgraph_persistence_dev:
+    driver: local
+  langgraph_logs_dev:
+    driver: local

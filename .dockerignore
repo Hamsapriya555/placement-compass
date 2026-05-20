@@ -1,0 +1,98 @@
+# =============================================================================
+# .dockerignore — LangGraph + FastAPI Backend
+# =============================================================================
+# Keeps the Docker build context small, speeds up builds, and prevents
+# leaking secrets or unnecessary files into the image.
+# =============================================================================
+
+# ── Git ───────────────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── Secrets / env files (NEVER bake into image) ───────────────────────────
+.env
+.env.*
+!.env.docker.example
+
+# ── Python cache / compiled files ─────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+
+# ── Virtual environments ───────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.virtualenv/
+
+# ── Test artifacts ─────────────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# ── Build / dist ───────────────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# ── Editor / IDE ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Node / frontend (not needed in Python image) ──────────────────────────
+node_modules/
+dist/
+.tanstack/
+.wrangler/
+bun.lockb
+package-lock.json
+*.js
+*.ts
+*.jsx
+*.tsx
+*.cjs
+*.mjs
+*.toml
+*.json
+!langgraph_app/pyproject.toml
+
+# ── Output / generated data (use volumes instead) ─────────────────────────
+langgraph_app/outputs/
+langgraph_app/persistence/
+langgraph_app/logs/
+
+# ── Documentation ─────────────────────────────────────────────────────────
+docs/
+*.md
+!langgraph_app/README.md
+
+# ── Docker files themselves ────────────────────────────────────────────────
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# ── Validation / test data ─────────────────────────────────────────────────
+validation_logs.txt
+validation_suite/
+validation_suite.zip
+
+# ── Other project directories not needed in the Python image ──────────────
+src/
+public/
+mobile-app/
+schema/
+supabase/
