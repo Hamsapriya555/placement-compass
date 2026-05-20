@@ -1,37 +1,36 @@
 pipeline {
 agent any
 
-```
-stages {
 
-    stage('Build Docker Image') {
-        steps {
-            bat 'docker build -t placement-intelligence-platform .'
+    stages {
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t placement-intelligence-platform .'
+            }
+        }
+
+        stage('Run Docker Container') {
+            steps {
+                bat 'docker compose up -d'
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                bat 'curl http://localhost:8000/v1/health'
+            }
         }
     }
 
-    stage('Run Docker Container') {
-        steps {
-            bat 'docker compose up -d'
+    post {
+        success {
+            echo 'Pipeline executed successfully!'
         }
-    }
 
-    stage('Health Check') {
-        steps {
-            bat 'curl http://localhost:8000/v1/health'
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }
 
-post {
-    success {
-        echo 'Pipeline executed successfully!'
-    }
-
-    failure {
-        echo 'Pipeline failed!'
-    }
-}
-```
-
-}
